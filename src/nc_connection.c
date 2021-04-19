@@ -86,6 +86,7 @@ static struct conn_tqh free_connq; /* free conn q */
 static uint64_t ntotal_conn;       /* total # connections counter from start */
 static uint32_t ncurr_conn;        /* current # connections */
 static uint32_t ncurr_cconn;       /* current # client connections */
+static uint32_t max_free_connq;    /* threeshold that trigger free instead of queue for reuse */
 
 /*
  * Return the context associated with this connection.
@@ -300,6 +301,11 @@ conn_put(struct conn *conn)
 
     log_debug(LOG_VVERB, "put conn %p", conn);
 
+    if (max_free_connq != 0 && nfree_connq >= max_free_connq) {
+        conn_free(conn);
+        return;
+    }
+
     nfree_connq++;
     TAILQ_INSERT_HEAD(&free_connq, conn, conn_tqe);
 
@@ -310,10 +316,11 @@ conn_put(struct conn *conn)
 }
 
 void
-conn_init(void)
+conn_init(struct instance *nci)
 {
     log_debug(LOG_DEBUG, "conn size %d", sizeof(struct conn));
     nfree_connq = 0;
+    max_free_connq = nci->max_reuse_queue;
     TAILQ_INIT(&free_connq);
 }
 

@@ -113,6 +113,7 @@ static uint64_t msg_id;          /* message id counter */
 static uint64_t frag_id;         /* fragment id counter */
 static uint32_t nfree_msgq;      /* # free msg q */
 static struct msg_tqh free_msgq; /* free msg q */
+static uint32_t max_free_msgq;   /* threeshold that triggers free instead of queue reuse */
 static struct rbtree tmo_rbt;    /* timeout rbtree */
 static struct rbnode tmo_rbs;    /* timeout rbtree sentinel */
 
@@ -389,6 +390,11 @@ msg_put(struct msg *msg)
         msg->keys = NULL;
     }
 
+    if (max_free_msgq != 0 && nfree_msgq >= max_free_msgq) {
+        msg_free(msg);
+        return;
+    }
+
     nfree_msgq++;
     TAILQ_INSERT_HEAD(&free_msgq, msg, m_tqe);
 }
@@ -419,12 +425,13 @@ msg_dump(struct msg *msg, int level)
 }
 
 void
-msg_init(void)
+msg_init(struct instance *nci)
 {
     log_debug(LOG_DEBUG, "msg size %d", sizeof(struct msg));
     msg_id = 0;
     frag_id = 0;
     nfree_msgq = 0;
+    max_free_msgq = nci->max_reuse_queue;
     TAILQ_INIT(&free_msgq);
     rbtree_init(&tmo_rbt, &tmo_rbs);
 }

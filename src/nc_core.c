@@ -161,8 +161,8 @@ core_start(struct instance *nci)
     struct context *ctx;
 
     mbuf_init(nci);
-    msg_init();
-    conn_init();
+    msg_init(nci);
+    conn_init(nci);
 
     ctx = core_ctx_create(nci);
     if (ctx != NULL) {

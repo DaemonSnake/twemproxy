@@ -99,7 +99,7 @@ struct conn *conn_get_proxy(void *owner);
 void conn_put(struct conn *conn);
 ssize_t conn_recv(struct conn *conn, void *buf, size_t size);
 ssize_t conn_sendv(struct conn *conn, struct array *sendv, size_t nsend);
-void conn_init(void);
+void conn_init(struct instance *nci);
 void conn_deinit(void);
 uint32_t conn_ncurr_conn(void);
 uint64_t conn_ntotal_conn(void);

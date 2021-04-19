@@ -278,7 +278,7 @@ struct msg *msg_tmo_min(void);
 void msg_tmo_insert(struct msg *msg, struct conn *conn);
 void msg_tmo_delete(struct msg *msg);
 
-void msg_init(void);
+void msg_init(struct instance *nci);
 void msg_deinit(void);
 struct string *msg_type_string(msg_type_t type);
 struct msg *msg_get(struct conn *conn, bool request, bool redis);

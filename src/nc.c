@@ -68,7 +68,7 @@ static struct option long_options[] = {
     { "stats-addr",     required_argument,  NULL,   'a' },
     { "pid-file",       required_argument,  NULL,   'p' },
     { "mbuf-size",      required_argument,  NULL,   'm' },
-    { "mbuf-number",    required_argument,  NULL,   'n' },
+    { "max-reuse",      required_argument,  NULL,   'n' },
     { NULL,             0,                  NULL,    0  }
 };
 
@@ -227,7 +227,7 @@ nc_show_usage(void)
         "  -i, --stats-interval=N : set stats aggregation interval in msec (default: %d msec)" CRLF
         "  -p, --pid-file=S       : set pid file (default: %s)" CRLF
         "  -m, --mbuf-size=N      : set size of mbuf chunk in bytes (default: %d bytes)" CRLF
-        "  -n, --mbuf-number=N    : set maximum number of mbuf chunks (default: 0, means no limit)" CRLF
+        "  -n, --max-reuse=N      : set max number of elements in reuse queues before switching to free (default: 0, means no limit)" CRLF
         "",
         NC_LOG_DEFAULT, NC_LOG_MIN, NC_LOG_MAX,
         NC_LOG_PATH != NULL ? NC_LOG_PATH : "stderr",
@@ -302,7 +302,7 @@ nc_set_default_options(struct instance *nci)
     nci->hostname[NC_MAXHOSTNAMELEN - 1] = '\0';
 
     nci->mbuf_chunk_size = NC_MBUF_SIZE;
-    nci->mbuf_chunk_max = 0;
+    nci->max_reuse_queue = 0;
 
     nci->pid = (pid_t)-1;
     nci->pid_filename = NULL;
@@ -421,13 +421,13 @@ nc_get_options(int argc, char **argv, struct instance *nci)
 
             if ((value != 0 && value < NC_MBUF_MIN_NUM) || 
                  value > NC_MBUF_MAX_NUM) {
-                log_stderr("nutcracker: maximum number of mbuf chunks must be "
+                log_stderr("nutcracker: maximum elements in reuse queues must be "
                            "zero or between %zu and %zu", NC_MBUF_MIN_NUM, 
                                NC_MBUF_MAX_NUM);
                 return NC_ERROR;
             }
 
-            nci->mbuf_chunk_max = (size_t)value;
+            nci->max_reuse_queue = (size_t)value;
             break;
 
         case '?':

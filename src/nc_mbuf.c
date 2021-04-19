@@ -273,7 +273,7 @@ mbuf_init(struct instance *nci)
 
     mbuf_chunk_size = nci->mbuf_chunk_size;
     mbuf_offset = mbuf_chunk_size - MBUF_HSIZE;
-    mbuf_chunk_max = nci->mbuf_chunk_max;
+    mbuf_chunk_max = nci->max_reuse_queue;
 
     log_debug(LOG_DEBUG, "mbuf hsize %d chunk size %zu offset %zu length %zu",
               MBUF_HSIZE, mbuf_chunk_size, mbuf_offset, mbuf_offset);
