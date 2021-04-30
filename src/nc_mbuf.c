@@ -19,32 +19,18 @@
 #include <string.h>
 
 #include <nc_core.h>
-
-static uint32_t nfree_mbufq;   /* # free mbuf */
-static struct mhdr free_mbufq; /* free mbuf q */
+#include <alloc/alloc.h>
 
 static size_t mbuf_chunk_size; /* mbuf chunk size - header + data (const) */
 static size_t mbuf_offset;     /* mbuf offset in chunk (const) */
-static size_t mbuf_chunk_max;  /* maximum number of mbuf chunks */
+static void *mbuf_allocator;
 
 static struct mbuf *
 _mbuf_get(void)
 {
     struct mbuf *mbuf;
-    uint8_t *buf;
+    uint8_t *buf = pool_allocator_alloc(mbuf_allocator);
 
-    if (!STAILQ_EMPTY(&free_mbufq)) {
-        ASSERT(nfree_mbufq > 0);
-
-        mbuf = STAILQ_FIRST(&free_mbufq);
-        nfree_mbufq--;
-        STAILQ_REMOVE_HEAD(&free_mbufq, next);
-
-        ASSERT(mbuf->magic == MBUF_MAGIC);
-        goto done;
-    }
-
-    buf = nc_alloc(mbuf_chunk_size);
     if (buf == NULL) {
         return NULL;
     }
@@ -70,8 +56,6 @@ _mbuf_get(void)
      */
     mbuf = (struct mbuf *)(buf + mbuf_offset);
     mbuf->magic = MBUF_MAGIC;
-
-done:
     STAILQ_NEXT(mbuf, next) = NULL;
     return mbuf;
 }
@@ -113,7 +97,7 @@ mbuf_free(struct mbuf *mbuf)
     ASSERT(mbuf->magic == MBUF_MAGIC);
 
     buf = (uint8_t *)mbuf - mbuf_offset;
-    nc_free(buf);
+    pool_allocator_free(mbuf_allocator, buf);
 }
 
 void
@@ -124,13 +108,7 @@ mbuf_put(struct mbuf *mbuf)
     ASSERT(STAILQ_NEXT(mbuf, next) == NULL);
     ASSERT(mbuf->magic == MBUF_MAGIC);
 
-    if (mbuf_chunk_max != 0 && nfree_mbufq >= mbuf_chunk_max) {
-        mbuf_free(mbuf);
-        return;
-    }
-
-    nfree_mbufq++;
-    STAILQ_INSERT_HEAD(&free_mbufq, mbuf, next);
+    mbuf_free(mbuf);
 }
 
 /*
@@ -268,12 +246,9 @@ mbuf_split(struct mhdr *h, uint8_t *pos, mbuf_copy_t cb, void *cbarg)
 void
 mbuf_init(struct instance *nci)
 {
-    nfree_mbufq = 0;
-    STAILQ_INIT(&free_mbufq);
-
     mbuf_chunk_size = nci->mbuf_chunk_size;
     mbuf_offset = mbuf_chunk_size - MBUF_HSIZE;
-    mbuf_chunk_max = nci->max_reuse_queue;
+    mbuf_allocator = new_pool_allocator(mbuf_chunk_size);
 
     log_debug(LOG_DEBUG, "mbuf hsize %d chunk size %zu offset %zu length %zu",
               MBUF_HSIZE, mbuf_chunk_size, mbuf_offset, mbuf_offset);
@@ -282,11 +257,6 @@ mbuf_init(struct instance *nci)
 void
 mbuf_deinit(void)
 {
-    while (!STAILQ_EMPTY(&free_mbufq)) {
-        struct mbuf *mbuf = STAILQ_FIRST(&free_mbufq);
-        mbuf_remove(&free_mbufq, mbuf);
-        mbuf_free(mbuf);
-        nfree_mbufq--;
-    }
-    ASSERT(nfree_mbufq == 0);
+    delete_pool_allocator(mbuf_allocator);
+    mbuf_allocator = NULL;
 }

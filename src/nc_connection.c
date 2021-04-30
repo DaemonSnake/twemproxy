@@ -22,6 +22,7 @@
 #include <nc_client.h>
 #include <nc_proxy.h>
 #include <proto/nc_proto.h>
+#include <alloc/alloc.h>
 
 /*
  *                   nc_connection.[ch]
@@ -81,12 +82,11 @@
  * the queue.
  */
 
-static uint32_t nfree_connq;       /* # free conn q */
-static struct conn_tqh free_connq; /* free conn q */
 static uint64_t ntotal_conn;       /* total # connections counter from start */
 static uint32_t ncurr_conn;        /* current # connections */
 static uint32_t ncurr_cconn;       /* current # client connections */
-static uint32_t max_free_connq;    /* threeshold that trigger free instead of queue for reuse */
+
+static void *conn_allocator;
 
 /*
  * Return the context associated with this connection.
@@ -109,21 +109,7 @@ conn_to_ctx(struct conn *conn)
 static struct conn *
 _conn_get(void)
 {
-    struct conn *conn;
-
-    if (!TAILQ_EMPTY(&free_connq)) {
-        ASSERT(nfree_connq > 0);
-
-        conn = TAILQ_FIRST(&free_connq);
-        nfree_connq--;
-        TAILQ_REMOVE(&free_connq, conn, conn_tqe);
-    } else {
-        conn = nc_alloc(sizeof(*conn));
-        if (conn == NULL) {
-            return NULL;
-        }
-    }
-
+    struct conn *conn = pool_allocator_alloc(conn_allocator);
     conn->owner = NULL;
 
     conn->sd = -1;
@@ -290,7 +276,7 @@ static void
 conn_free(struct conn *conn)
 {
     log_debug(LOG_VVERB, "free conn %p", conn);
-    nc_free(conn);
+    pool_allocator_free(conn_allocator, conn);
 }
 
 void
@@ -301,41 +287,20 @@ conn_put(struct conn *conn)
 
     log_debug(LOG_VVERB, "put conn %p", conn);
 
-    if (max_free_connq != 0 && nfree_connq >= max_free_connq) {
-        conn_free(conn);
-        return;
-    }
-
-    nfree_connq++;
-    TAILQ_INSERT_HEAD(&free_connq, conn, conn_tqe);
-
-    if (conn->client) {
-        ncurr_cconn--;
-    }
-    ncurr_conn--;
+    pool_allocator_free(conn_allocator, conn);
 }
 
 void
 conn_init(struct instance *nci)
 {
     log_debug(LOG_DEBUG, "conn size %d", sizeof(struct conn));
-    nfree_connq = 0;
-    max_free_connq = nci->max_reuse_queue;
-    TAILQ_INIT(&free_connq);
+    conn_allocator = new_pool_allocator(sizeof(struct conn));
 }
 
 void
 conn_deinit(void)
 {
-    struct conn *conn, *nconn; /* current and next connection */
-
-    for (conn = TAILQ_FIRST(&free_connq); conn != NULL;
-         conn = nconn, nfree_connq--) {
-        ASSERT(nfree_connq > 0);
-        nconn = TAILQ_NEXT(conn, conn_tqe);
-        conn_free(conn);
-    }
-    ASSERT(nfree_connq == 0);
+    delete_pool_allocator(conn_allocator);
 }
 
 ssize_t

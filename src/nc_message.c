@@ -23,6 +23,7 @@
 #include <nc_core.h>
 #include <nc_server.h>
 #include <proto/nc_proto.h>
+#include <alloc/alloc.h>
 
 #if (IOV_MAX > 128)
 #define NC_IOV_MAX 128
@@ -111,11 +112,9 @@
 
 static uint64_t msg_id;          /* message id counter */
 static uint64_t frag_id;         /* fragment id counter */
-static uint32_t nfree_msgq;      /* # free msg q */
-static struct msg_tqh free_msgq; /* free msg q */
-static uint32_t max_free_msgq;   /* threeshold that triggers free instead of queue reuse */
 static struct rbtree tmo_rbt;    /* timeout rbtree */
 static struct rbnode tmo_rbs;    /* timeout rbtree sentinel */
+static void *msg_allocator;
 
 #define DEFINE_ACTION(_name) string(#_name),
 static struct string msg_type_strings[] = {
@@ -194,18 +193,8 @@ msg_tmo_delete(struct msg *msg)
 static struct msg *
 _msg_get(void)
 {
-    struct msg *msg;
+    struct msg *msg = pool_allocator_alloc(msg_allocator);
 
-    if (!TAILQ_EMPTY(&free_msgq)) {
-        ASSERT(nfree_msgq > 0);
-
-        msg = TAILQ_FIRST(&free_msgq);
-        nfree_msgq--;
-        TAILQ_REMOVE(&free_msgq, msg, m_tqe);
-        goto done;
-    }
-
-    msg = nc_alloc(sizeof(*msg));
     if (msg == NULL) {
         return NULL;
     }
@@ -365,7 +354,7 @@ msg_free(struct msg *msg)
     ASSERT(STAILQ_EMPTY(&msg->mhdr));
 
     log_debug(LOG_VVERB, "free msg %p id %"PRIu64"", msg, msg->id);
-    nc_free(msg);
+    pool_allocator_free(msg_allocator, msg);
 }
 
 void
@@ -390,13 +379,7 @@ msg_put(struct msg *msg)
         msg->keys = NULL;
     }
 
-    if (max_free_msgq != 0 && nfree_msgq >= max_free_msgq) {
-        msg_free(msg);
-        return;
-    }
-
-    nfree_msgq++;
-    TAILQ_INSERT_HEAD(&free_msgq, msg, m_tqe);
+    msg_free(msg);
 }
 
 void
@@ -430,24 +413,14 @@ msg_init(struct instance *nci)
     log_debug(LOG_DEBUG, "msg size %d", sizeof(struct msg));
     msg_id = 0;
     frag_id = 0;
-    nfree_msgq = 0;
-    max_free_msgq = nci->max_reuse_queue;
-    TAILQ_INIT(&free_msgq);
+    msg_allocator = new_pool_allocator(sizeof(struct msg));
     rbtree_init(&tmo_rbt, &tmo_rbs);
 }
 
 void
 msg_deinit(void)
 {
-    struct msg *msg, *nmsg;
-
-    for (msg = TAILQ_FIRST(&free_msgq); msg != NULL;
-         msg = nmsg, nfree_msgq--) {
-        ASSERT(nfree_msgq > 0);
-        nmsg = TAILQ_NEXT(msg, m_tqe);
-        msg_free(msg);
-    }
-    ASSERT(nfree_msgq == 0);
+    delete_pool_allocator(msg_allocator);
 }
 
 struct string *
