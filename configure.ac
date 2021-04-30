@@ -5,8 +5,8 @@ m4_define([NC_PATCH], 0)
 m4_define([NC_BUGS], [manj@cs.stanford.edu])
 
 # Initialize autoconf
-AC_PREREQ([2.64])
-AC_INIT([nutcracker], [NC_MAJOR.NC_MINOR.NC_PATCH], [NC_BUGS])
+AC_PREREQ([2.71])
+AC_INIT([nutcracker],[NC_MAJOR.NC_MINOR.NC_PATCH],[NC_BUGS])
 AC_CONFIG_SRCDIR([src/nc.c])
 AC_CONFIG_AUX_DIR([config])
 AC_CONFIG_HEADERS([config.h:config.h.in])
@@ -23,6 +23,7 @@ AC_DEFINE(NC_VERSION_STRING, "NC_MAJOR.NC_MINOR.NC_PATCH", [Define the version s
 
 # Checks for language
 AC_LANG([C])
+AC_LANG([C++])
 
 # Checks for programs
 AC_PROG_AWK
@@ -33,7 +34,7 @@ AC_PROG_INSTALL
 AC_PROG_LN_S
 AC_PROG_MAKE_SET
 AC_PROG_RANLIB
-AC_PROG_LIBTOOL
+LT_INIT
 
 # Checks for typedefs, structures, and compiler characteristics
 AC_C_INLINE
@@ -71,6 +72,7 @@ AC_CHECK_HEADERS([execinfo.h],
   [AC_DEFINE(HAVE_BACKTRACE, [1], [Define to 1 if backtrace is supported])], [])
 AC_CHECK_HEADERS([sys/epoll.h], [], [])
 AC_CHECK_HEADERS([sys/event.h], [], [])
+AC_CHECK_HEADERS([boost/pool/pool.hpp])
 
 # Checks for libraries
 AC_CHECK_LIB([m], [pow])
@@ -86,7 +88,7 @@ AC_CHECK_FUNCS([memchr memmove memset])
 AC_CHECK_FUNCS([strchr strndup strtoul])
 
 AC_CACHE_CHECK([if epoll works], [ac_cv_epoll_works],
-  AC_TRY_RUN([
+  AC_RUN_IFELSE([AC_LANG_SOURCE([[
 #include <stdio.h>
 #include <stdlib.h>
 #include <sys/epoll.h>
@@ -102,12 +104,12 @@ main(int argc, char **argv)
     }
     exit(0);
 }
-  ], [ac_cv_epoll_works=yes], [ac_cv_epoll_works=no]))
+  ]])],[ac_cv_epoll_works=yes],[ac_cv_epoll_works=no],[]))
 AS_IF([test "x$ac_cv_epoll_works" = "xyes"],
   [AC_DEFINE([HAVE_EPOLL], [1], [Define to 1 if epoll is supported])], [])
 
 AC_CACHE_CHECK([if kqueue works], [ac_cv_kqueue_works],
-  AC_TRY_RUN([
+  AC_RUN_IFELSE([AC_LANG_SOURCE([[
 #include <stdio.h>
 #include <stdlib.h>
 #include <sys/types.h>
@@ -125,12 +127,12 @@ main(int argc, char **argv)
     }
     exit(0);
 }
-  ], [ac_cv_kqueue_works=yes], [ac_cv_kqueue_works=no]))
+  ]])],[ac_cv_kqueue_works=yes],[ac_cv_kqueue_works=no],[]))
 AS_IF([test "x$ac_cv_kqueue_works" = "xyes"],
   [AC_DEFINE([HAVE_KQUEUE], [1], [Define to 1 if kqueue is supported])], [])
 
 AC_CACHE_CHECK([if event ports works], [ac_cv_evports_works],
-  AC_TRY_RUN([
+  AC_RUN_IFELSE([AC_LANG_SOURCE([[
 #include <stdio.h>
 #include <stdlib.h>
 #include <port.h>
@@ -146,7 +148,7 @@ main(int argc, char **argv)
     }
     exit(0);
 }
-  ], [ac_cv_evports_works=yes], [ac_cv_evports_works=no]))
+  ]])],[ac_cv_evports_works=yes],[ac_cv_evports_works=no],[]))
 AS_IF([test "x$ac_cv_evports_works" = "xyes"],
   [AC_DEFINE([HAVE_EVENT_PORTS], [1], [Define to 1 if event ports is supported])], [])
 
@@ -208,7 +210,8 @@ AC_CONFIG_FILES([Makefile
                  src/Makefile
                  src/hashkit/Makefile
                  src/proto/Makefile
-                 src/event/Makefile])
+                 src/event/Makefile
+                 src/alloc/Makefile])
 
 # Generate the "configure" script
 AC_OUTPUT
