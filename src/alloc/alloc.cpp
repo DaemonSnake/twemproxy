@@ -17,6 +17,8 @@ void *pool_allocator_alloc(void *handle) noexcept {
 }
 
 void pool_allocator_free(void *handle, void *addr) noexcept {
+  if (not addr)
+    return;
   reinterpret_cast<alloc_t *>(handle)->free(addr);
 }
 

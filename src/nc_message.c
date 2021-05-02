@@ -114,7 +114,7 @@ static uint64_t msg_id;          /* message id counter */
 static uint64_t frag_id;         /* fragment id counter */
 static struct rbtree tmo_rbt;    /* timeout rbtree */
 static struct rbnode tmo_rbs;    /* timeout rbtree sentinel */
-static void *msg_allocator;
+static struct pool_allocator *msg_allocator;
 
 #define DEFINE_ACTION(_name) string(#_name),
 static struct string msg_type_strings[] = {
@@ -199,7 +199,6 @@ _msg_get(void)
         return NULL;
     }
 
-done:
     /* c_tqe, s_tqe, and m_tqe are left uninitialized */
     msg->id = ++msg_id;
     msg->peer = NULL;
@@ -421,6 +420,7 @@ void
 msg_deinit(void)
 {
     delete_pool_allocator(msg_allocator);
+    msg_allocator = NULL;
 }
 
 struct string *

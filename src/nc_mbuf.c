@@ -23,7 +23,7 @@
 
 static size_t mbuf_chunk_size; /* mbuf chunk size - header + data (const) */
 static size_t mbuf_offset;     /* mbuf offset in chunk (const) */
-static void *mbuf_allocator;
+static struct pool_allocator *mbuf_allocator;
 
 static struct mbuf *
 _mbuf_get(void)

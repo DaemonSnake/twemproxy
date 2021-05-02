@@ -86,7 +86,7 @@ static uint64_t ntotal_conn;       /* total # connections counter from start */
 static uint32_t ncurr_conn;        /* current # connections */
 static uint32_t ncurr_cconn;       /* current # client connections */
 
-static void *conn_allocator;
+static struct pool_allocator *conn_allocator;
 
 /*
  * Return the context associated with this connection.
@@ -301,6 +301,7 @@ void
 conn_deinit(void)
 {
     delete_pool_allocator(conn_allocator);
+    conn_allocator = NULL;
 }
 
 ssize_t
